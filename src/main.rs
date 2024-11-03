@@ -1,8 +1,8 @@
+use std::collections::{hash_map::Entry, HashMap};
 use std::io::stdin;
 
 fn main() {
-    // let mut memory: f64 = 0.0;
-    let mut memories: Vec<f64> = vec![0.0; 10];
+    let mut memory = Memory::new();
     let mut prev_result: f64 = 0.0;
     for line in stdin().lines() {
         // 1行読み取って空行なら終了
@@ -16,41 +16,62 @@ fn main() {
         // memoryへの書き込み
         let is_memory = tokens[0].starts_with("mem");
         if is_memory && tokens[0].ends_with('+') {
-            add_and_print_memory(&mut memories, tokens[0], prev_result);
+            memory.add_and_print(tokens[0], prev_result);
             continue;
         } else if is_memory && tokens[0].ends_with('-') {
-            add_and_print_memory(&mut memories, tokens[0], -prev_result);
+            memory.add_and_print(tokens[0], -prev_result);
             continue;
         }
 
         // 式の計算
-        let left = eval_token(tokens[0], &memories);
-        let right = eval_token(tokens[2], &memories);
+        let left = memory.eval_token(tokens[0]);
+        let right = memory.eval_token(tokens[2]);
         let result = eval_expression(left, tokens[1], right);
         print_output(result);
         prev_result = result;
     }
 }
 
-fn add_and_print_memory(memories: &mut [f64], token: &str, prev_result: f64) {
-    let slot_index: usize = token[3..token.len() - 1].parse().unwrap();
-    memories[slot_index] += prev_result; // 自動的に参照外しが行われる
-                                         // (*memories)[slot_index] += prev_result; と同じ
-    print_output(memories[slot_index]);
+struct Memory {
+    slots: HashMap<String, f64>
+}
+
+impl Memory {
+    fn new() -> Self {
+        Self {
+            slots: HashMap::new(),
+        }
+    }
+
+    fn add_and_print(&mut self, token: &str, prev_result: f64) {
+        let slot_name = token[3..token.len() - 1].to_string();
+        // slot_nameに対応するメモリを探す
+        match self.slots.entry(slot_name) {
+            Entry::Occupied(mut entry) => {
+                // メモリが見つかったので、値を書き換える
+                *entry.get_mut() += prev_result;
+                print_output(*entry.get());
+            }
+            Entry::Vacant(entry) => {
+                // メモリが見つからなかったので、値を書き込む
+                entry.insert(prev_result);
+                print_output(prev_result);
+            }
+        }
+    }
+
+    fn eval_token(&self, token: &str) -> f64 {
+        if token.starts_with("mem") {
+            let slot_name = &token[3..];
+            self.slots.get(slot_name).copied().unwrap_or(0.0)
+        } else {
+            token.parse().unwrap()
+        }
+    }
 }
 
 fn print_output(value: f64) {
     println!(" => {}", value);
-}
-
-fn eval_token(token: &str, memories: &[f64]) -> f64 {
-    if token.starts_with("mem") {
-        let slot_index: usize = token[3..].parse().unwrap();
-        memories[slot_index]
-    } else {
-        // 参照のtoken(&str)をもとに新しいf64の値を生成して返す
-        token.parse().unwrap() // 型を指定しなくていいのは、memoryがf64なので型推論されている
-    }
 }
 
 fn eval_expression(left: f64, operator: &str, right: f64) -> f64 {
