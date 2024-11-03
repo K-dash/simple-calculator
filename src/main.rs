@@ -1,3 +1,4 @@
+use std::collections::{hash_map::Entry, HashMap};
 use std::io::stdin;
 
 fn main() {
@@ -32,41 +33,37 @@ fn main() {
 }
 
 struct Memory {
-    slots: Vec<(String, f64)>,
+    slots: HashMap<String, f64>
 }
 
 impl Memory {
     fn new() -> Self {
-        Self { slots: vec![] }
+        Self {
+            slots: HashMap::new(),
+        }
     }
 
     fn add_and_print(&mut self, token: &str, prev_result: f64) {
-        let slot_name = &token[3..token.len() - 1];
-        // すべてのメモリを探索する
-        for slot in self.slots.iter_mut() {
-            if slot.0 == slot_name {
-                // メモリが見つかったので、値を更新・表示して終了
-                slot.1 += prev_result;
-                print_output(slot.1);
-                return;
+        let slot_name = token[3..token.len() - 1].to_string();
+        // slot_nameに対応するメモリを探す
+        match self.slots.entry(slot_name) {
+            Entry::Occupied(mut entry) => {
+                // メモリが見つかったので、値を書き換える
+                *entry.get_mut() += prev_result;
+                print_output(*entry.get());
+            }
+            Entry::Vacant(entry) => {
+                // メモリが見つからなかったので、値を書き込む
+                entry.insert(prev_result);
+                print_output(prev_result);
             }
         }
-        self.slots.push((slot_name.to_string(), prev_result));
-        print_output(prev_result);
     }
 
     fn eval_token(&self, token: &str) -> f64 {
         if token.starts_with("mem") {
             let slot_name = &token[3..];
-            // すべてのメモリを探索する
-            for slot in &self.slots {
-                if slot.0 == slot_name {
-                    // メモリが見つかったので、値を返す
-                    return slot.1;
-                }
-            }
-            // メモリが見つからなかったので、0.0を返す
-            0.0
+            self.slots.get(slot_name).copied().unwrap_or(0.0)
         } else {
             token.parse().unwrap()
         }
